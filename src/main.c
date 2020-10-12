@@ -1,7 +1,5 @@
 #include "rle.h"
 
-extern int errno;
-
 int main(int argc, char *argv[])
 {
   if(argc< 4)
@@ -54,70 +52,69 @@ int main(int argc, char *argv[])
     return -5;
   }
 
+  //Thread and data structure initiation
   pthread_t *threads = (pthread_t*) malloc(sizeof(pthread_t)*no_of_threads);
   struct thread_data *p_thread_data = (struct thread_data*) malloc(sizeof(struct thread_data)*no_of_threads);
 
   int rc;
   unsigned char i;
-  char out_file_name[5] = {};
+  char out_file_name[THREAD_OUTPUT_FILE_NAME_SIZE] = {};
 
+  //Iterate over threads
   for(i=0; i<no_of_threads; i++)
   {
+    //initialize thread function argument structure
     p_thread_data[i].thread_id = i;
+    p_thread_data[i].in = buffer;
 
-  p_thread_data[i].in = buffer;
-
-  if(strcmp(argv[1], "encode") == 0)
-  {
-    if(i != 0)
+    if(strcmp(argv[1], "encode") == 0)
     {
-      p_thread_data[i].in += p_thread_data[i-1].size;
+      if(i != 0)
+      {
+        p_thread_data[i].in += p_thread_data[i-1].size;
+      }
+
+      p_thread_data[i].size = lSize/no_of_threads;
+      if(i < lSize%no_of_threads)
+      {
+        p_thread_data[i].size++;
+      }
+
+      rc = pthread_create(&threads[i], NULL, encoder, (void *)(&p_thread_data[i]));
+      if (rc)
+      {
+        printf("ERROR; return code from pthread_create() is %d\n", rc);
+        exit(-1);
+      }
     }
-
-    p_thread_data[i].size = lSize/no_of_threads;
-    if(i < lSize%no_of_threads)
+    else
     {
-      p_thread_data[i].size++;
-    }
+      if(i != 0)
+      {
+        p_thread_data[i].in += p_thread_data[i-1].size;
+      }
 
-    rc = pthread_create(&threads[i], NULL, encoder, (void *)(&p_thread_data[i]));
-    if (rc)
-    {
-      printf("ERROR; return code from pthread_create() is %d\n", rc);
-      exit(-1);
+      p_thread_data[i].size = ((lSize>>1)/no_of_threads);
+      if(i < (lSize>>1)%no_of_threads)
+      {
+        p_thread_data[i].size++;
+      }
+      p_thread_data[i].size <<= 1;
+
+      rc = pthread_create(&threads[i], NULL, decoder, (void *)(&p_thread_data[i]));
+      if (rc)
+      {
+        printf("ERROR; return code from pthread_create() is %d\n", rc);
+        exit(-1);
+      }
     }
   }
-  else
-  {
-    if(i != 0)
-    {
-      p_thread_data[i].in += p_thread_data[i-1].size;
-    }
-
-    p_thread_data[i].size = ((lSize>>1)/no_of_threads);
-    if(i < (lSize>>1)%no_of_threads)
-    {
-      p_thread_data[i].size++;
-    }
-    p_thread_data[i].size <<= 1;
-
-    rc = pthread_create(&threads[i], NULL, decoder, (void *)(&p_thread_data[i]));
-    if (rc)
-    {
-      printf("ERROR; return code from pthread_create() is %d\n", rc);
-      exit(-1);
-    }
-  }
-}
 
   //Wait for threads to complete
   for(i=0; i<no_of_threads; i++)
   {
     pthread_join(threads[i], NULL);
   }
-  // clock_t end = clock() ;
-  // double elapsed_time = (end-start)/(double)CLOCKS_PER_SEC ;
-  // printf("TIME TAKEN- %f", elapsed_time);
 
   //Input file and buffer cleanup
   free(buffer);
