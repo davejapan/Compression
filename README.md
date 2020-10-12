@@ -18,4 +18,4 @@ Interestingly, even while encoding 1GB sized file, multithreaded run takes signi
 
 Note
 
-run length encoding is worst candidate for image/binary compression.
+run length encoding is terrible candidate for image/binary compression.
